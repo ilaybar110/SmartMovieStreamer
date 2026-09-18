@@ -294,6 +294,7 @@
     <div class="cast-bar-label">חיבור לטלוויזיה</div>
     <google-cast-launcher id="castButton"></google-cast-launcher>
     <div id="castStatus" class="disconnected">לא מחובר לטלוויזיה</div>
+    <div id="debugBox" style="font-size:0.8em; color:#ffcc00; direction:ltr; text-align:left; background:#000; padding:8px; border-radius:8px; width:100%; word-break:break-all;">בודק מצב טעינה...</div>
   </div>
 
   <div class="instructions">
@@ -356,7 +357,26 @@
   <footer>קולנוע של מלכל'ה &copy; לסבא וסבתא, באהבה</footer>
 </div>
 
-<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+<script>
+  // On-screen debug logger — shows what's happening without needing USB/DevTools.
+  const debugBox = document.getElementById('debugBox');
+  const debugLines = [];
+  function debugLog(msg) {
+    debugLines.push(msg);
+    debugBox.textContent = debugLines.join(' | ');
+    console.log('[CastDebug]', msg);
+  }
+
+  window.onerror = function(message, source, lineno, colno, error) {
+    debugLog('JS ERROR: ' + message + ' (line ' + lineno + ')');
+    return false;
+  };
+
+  debugLog('דף נטען, מנסה לטעון סקריפט Cast...');
+</script>
+<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"
+        onload="debugLog('הסקריפט נטען בהצלחה')"
+        onerror="debugLog('שגיאה: הסקריפט חסום או נכשל בטעינה מהרשת')"></script>
 <script>
   let castContext = null;
   const statusEl = document.getElementById('castStatus');
@@ -373,14 +393,26 @@
     }
   }
 
+  // If the SDK never calls back within 6 seconds, something is silently blocking it.
+  setTimeout(function() {
+    if (!castContext) {
+      debugLog('אזהרה: 6 שניות עברו וה-Cast API עדיין לא אותחל (__onGCastApiAvailable לא נקרא)');
+    }
+  }, 6000);
+
   window['__onGCastApiAvailable'] = function(isAvailable) {
+    debugLog('__onGCastApiAvailable נקרא, isAvailable=' + isAvailable);
     if (isAvailable) {
       initializeCastApi();
+    } else {
+      debugLog('ה-API דיווח שהוא לא זמין בדפדפן הזה');
     }
   };
 
   function initializeCastApi() {
+    debugLog('מאתחל CastContext...');
     castContext = cast.framework.CastContext.getInstance();
+    debugLog('CastContext אותחל בהצלחה');
 
     castContext.setOptions({
       receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
